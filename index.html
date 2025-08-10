@@ -1,0 +1,334 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Free Pomodoro Timer</title>
+  <style>
+    :root{
+      --bg: #f4f6fb;
+      --bg-grad-1:#eef8f2;
+      --bg-grad-2:#ffffff;
+      --card:#ffffff;
+      --border:#e9edf5;
+      --text:#0f172a;
+      --muted:#64748b;
+      --accent:#8a38ff; /* default ring */
+      --good:#16a34a;
+      --warn:#f59e0b;
+      --shadow:0 10px 30px rgba(15,23,42,.08);
+      --radius:28px;
+    }
+
+    *{box-sizing:border-box}
+    html,body{height:100%}
+    body{
+      margin:0;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, Segoe UI, Roboto, Helvetica, Arial, Apple Color Emoji, Segoe UI Emoji;
+      color:var(--text);
+      background:
+        radial-gradient(800px 500px at 85% 0%, var(--bg-grad-1) 0%, var(--bg-grad-2) 55%),
+        var(--bg);
+      min-height:100vh;
+      display:grid; grid-template-rows:auto 1fr auto;
+      -webkit-font-smoothing:antialiased; -moz-osx-font-smoothing:grayscale;
+    }
+
+    header{display:flex; align-items:center; justify-content:space-between; padding:16px clamp(16px,3vw,28px)}
+    .brand{display:flex; align-items:center; gap:12px; font-weight:700; letter-spacing:.2px}
+    .brand .logo{width:28px; height:28px; border-radius:9px; background:conic-gradient(from 210deg, #50e3a4, #93c5fd, #50e3a4); box-shadow:0 4px 20px rgba(99,102,241,.25)}
+
+    .options-btn{appearance:none; border:1px solid var(--border); background:#fff; color:var(--text); padding:10px 14px; border-radius:14px; font-weight:700; cursor:pointer; box-shadow:var(--shadow); transition:transform .06s ease, box-shadow .2s ease}
+    .options-btn:hover{box-shadow:0 14px 30px rgba(15,23,42,.12)}
+    .options-btn:active{transform:translateY(1px) scale(.99)}
+
+    .container{display:grid; place-items:center; padding:12px}
+
+    .card{background:linear-gradient(180deg, rgba(255,255,255,.9), rgba(255,255,255,.96)); border:1px solid var(--border); border-radius:var(--radius); box-shadow:var(--shadow); padding:clamp(16px,3vw,28px); width:min(720px,94vw)}
+
+    .mode-chip{display:inline-flex; align-items:center; gap:8px; background:#f8fafc; border:1px solid var(--border); color:var(--text); padding:8px 12px; border-radius:999px; font-size:12px; letter-spacing:.25px}
+    .mode-dot{width:8px; height:8px; border-radius:50%; background:var(--good); box-shadow:0 0 0 3px rgba(22,163,74,.12)}
+
+    .timer-wrap{position:relative; width:min(72vmin,460px); aspect-ratio:1/1; margin:18px auto 8px}
+    .timer-wrap svg{width:100%; height:100%; overflow:visible} /* allow glow beyond ring */
+
+    .timer-face{position:absolute; inset:0; pointer-events:none}
+    .time-center{position:absolute; top:50%; left:50%; transform:translate(-50%, -50%); text-align:center}
+    .time{font-size:clamp(44px, 12vmin, 84px); font-weight:800; letter-spacing:1px}
+    .subtext{position:absolute; left:50%; transform:translateX(-50%); top:calc(50% + clamp(34px, 8vmin, 56px)); font-size:clamp(12px,2.2vmin,14px); color:var(--muted)}
+
+    .controls{display:flex; gap:12px; justify-content:center; margin-top:18px; flex-wrap:wrap}
+    .btn{min-width:120px; padding:14px 18px; border-radius:16px; border:1px solid var(--border); cursor:pointer; font-weight:700; letter-spacing:.3px; background:#fff; transition:transform .06s ease, box-shadow .2s ease; box-shadow:var(--shadow)}
+    .btn:active{transform:translateY(1px) scale(.99)}
+    .btn.primary{background:var(--accent); border-color:transparent; color:white; box-shadow:0 12px 28px color-mix(in oklab, var(--accent) 30%, transparent)}
+
+    /* Footer */
+    .footer{ text-align:center; color:var(--muted); font-size:12px; padding:20px 18px }
+
+    /* Drawer */
+    .drawer-overlay{position:fixed; inset:0; background:rgba(15,23,42,.18); display:none; z-index:30}
+    .drawer{position:fixed; top:0; right:0; height:100%; width:min(92vw,380px); background:var(--card); color:var(--text); box-shadow:var(--shadow); border-left:1px solid var(--border); transform:translateX(100%); transition:transform .28s cubic-bezier(.22,.61,.36,1); z-index:40; display:grid; grid-template-rows:auto 1fr auto}
+    .drawer.open{transform:translateX(0)}
+    .drawer-overlay.show{display:block}
+    .drawer header{padding:18px 18px; border-bottom:1px solid var(--border); font-weight:700}
+    .drawer .content{padding:16px 18px; overflow:auto}
+
+    .field{display:grid; grid-template-columns: 1fr auto; gap:10px; align-items:center; padding:12px 0}
+    .field label{color:var(--muted); font-size:13px}
+    .field input[type="number"], .field input[type="color"], .field select{background:#fff; color:var(--text); border:1px solid var(--border); border-radius:12px; padding:10px 12px; width:130px}
+    .field input[type="color"]{padding:0; height:40px}
+
+    .switch{display:inline-flex; align-items:center; gap:10px}
+    .switch input{width:42px; height:26px; appearance:none; background:#e2e8f0; border-radius:999px; position:relative; outline:none; transition:background .2s ease}
+    .switch input:checked{background:var(--accent)}
+    .switch input::after{content:""; position:absolute; top:3px; left:3px; width:20px; height:20px; background:white; border-radius:50%; transition:transform .2s ease; box-shadow:0 2px 6px rgba(0,0,0,.15)}
+    .switch input:checked::after{transform:translateX(16px)}
+
+    .hint{color:var(--muted); font-size:12px; margin-top:6px}
+
+    @media (max-width:420px){.btn{min-width:100px}}
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand" aria-label="Pomodoro">
+      <span class="logo" aria-hidden="true"></span>
+      <span>Pomodoro</span>
+    </div>
+    <button class="options-btn" id="openDrawerBtn" aria-label="Open settings">Options ▸</button>
+  </header>
+
+  <main class="container">
+    <section class="card" aria-live="polite">
+      <div class="mode-chip" id="modeChip">
+        <span class="mode-dot" id="modeDot"></span>
+        <span id="modeLabel">Work</span>
+      </div>
+
+      <div class="timer-wrap">
+        <!-- Enlarged viewBox + overflow:visible prevent glow clipping -->
+        <svg viewBox="0 0 140 140" role="img" aria-label="Timer progress">
+          <defs>
+            <filter id="ringGlow" filterUnits="userSpaceOnUse" x="-20" y="-20" width="180" height="180">
+              <feGaussianBlur in="SourceGraphic" stdDeviation="3.2" result="blur"/>
+              <feMerge>
+                <feMergeNode in="blur"/>
+                <feMergeNode in="SourceGraphic"/>
+              </feMerge>
+            </filter>
+          </defs>
+          <!-- Track -->
+          <circle cx="70" cy="70" r="56" stroke="#e8eef7" stroke-width="10" fill="none" />
+          <!-- Glow underlay (slightly thicker) -->
+          <circle id="progressGlow" cx="70" cy="70" r="56" stroke="var(--accent)" stroke-opacity=".65" stroke-width="14" fill="none" stroke-linecap="round" transform="rotate(-90 70 70)" stroke-dasharray="351.858" stroke-dashoffset="351.858" filter="url(#ringGlow)" />
+          <!-- Crisp progress on top -->
+          <circle id="progress" cx="70" cy="70" r="56" stroke="var(--accent)" stroke-width="10" fill="none" stroke-linecap="round" transform="rotate(-90 70 70)" stroke-dasharray="351.858" stroke-dashoffset="351.858" />
+        </svg>
+        <div class="timer-face">
+          <div class="time-center"><div class="time" id="timeText">25:00</div></div>
+          <div class="subtext"><span id="cycleText">Repeating</span></div>
+        </div>
+      </div>
+
+      <div class="controls">
+        <button class="btn primary" id="startBtn">Start</button>
+        <button class="btn" id="resetBtn">Reset</button>
+      </div>
+    </section>
+  </main>
+
+  <!-- Simple centered footer (update the text inside as needed) -->
+  <footer class="footer" id="siteFooter" role="contentinfo">© <span id="year"></span> Super Nice Tools✨</footer>
+
+  <!-- Drawer -->
+  <div class="drawer-overlay" id="drawerOverlay"></div>
+  <aside class="drawer" id="drawer" aria-label="Settings drawer" aria-hidden="true">
+    <header>Settings</header>
+    <div class="content">
+      <div class="field">
+        <label for="workMins">Work length (minutes)</label>
+        <input id="workMins" type="number" min="1" max="180" step="1" value="25" />
+      </div>
+      <div class="field">
+        <label for="breakMins">Break length (minutes)</label>
+        <input id="breakMins" type="number" min="1" max="60" step="1" value="5" />
+      </div>
+      <div class="field">
+        <label for="cycles">Number of cycles (0 = repeat)</label>
+        <input id="cycles" type="number" min="0" max="24" step="1" value="0" />
+      </div>
+      <div class="field">
+        <label for="colorPicker">Progress ring color</label>
+        <input id="colorPicker" type="color" value="#8a38ff" title="Choose ring color" />
+      </div>
+      <div class="field" style="grid-template-columns: 1fr auto;">
+        <label>Sound on phase switch</label>
+        <label class="switch"><input type="checkbox" id="soundToggle" checked></label>
+      </div>
+      <div class="hint">A "cycle" is one Work + one Break. If cycles = 0, the timer repeats indefinitely. The ring color also controls the glow.</div>
+    </div>
+    <div style="padding: 18px; border-top:1px solid var(--border); display:flex; gap:10px;">
+      <button class="btn" id="closeDrawerBtn" style="flex:1;">Close</button>
+      <button class="btn primary" id="applyBtn" style="flex:1;">Apply</button>
+    </div>
+  </aside>
+
+  <script>
+    (function(){
+      // Elements
+      const progress = document.getElementById('progress');
+      const progressGlow = document.getElementById('progressGlow');
+      const timeText = document.getElementById('timeText');
+      const startBtn = document.getElementById('startBtn');
+      const resetBtn = document.getElementById('resetBtn');
+      const modeLabel = document.getElementById('modeLabel');
+      const modeDot = document.getElementById('modeDot');
+      const cycleText = document.getElementById('cycleText');
+      const yearEl = document.getElementById('year');
+
+      const drawer = document.getElementById('drawer');
+      const overlay = document.getElementById('drawerOverlay');
+      const openDrawerBtn = document.getElementById('openDrawerBtn');
+      const closeDrawerBtn = document.getElementById('closeDrawerBtn');
+      const applyBtn = document.getElementById('applyBtn');
+
+      const workMins = document.getElementById('workMins');
+      const breakMins = document.getElementById('breakMins');
+      const cyclesInput = document.getElementById('cycles');
+      const soundToggle = document.getElementById('soundToggle');
+      const colorPicker = document.getElementById('colorPicker');
+
+      // Circumference from actual SVG radius for resiliency
+      const R = parseFloat(progress.getAttribute('r'));
+      const CIRC = 2 * Math.PI * R;
+      progress.setAttribute('stroke-dasharray', CIRC);
+      progressGlow.setAttribute('stroke-dasharray', CIRC);
+
+      let settings = loadSettings();
+
+      let mode = 'work';
+      let totalSeconds = settings.work * 60;
+      let remainingSeconds = totalSeconds;
+      let cyclesPlanned = settings.cycles; // 0 = infinite
+      let cyclesDone = 0;
+      let running = false; let paused = false; let rafId = null; let startTimestamp = null;
+
+      // Initialize UI
+      updateColor(settings.color || getComputedStyle(document.documentElement).getPropertyValue('--accent').trim());
+      updateUIFromSettings();
+      updateDisplay();
+      // Footer year auto-fill
+      if (yearEl) yearEl.textContent = new Date().getFullYear();
+
+      // Drawer
+      function openDrawer(){drawer.classList.add('open'); overlay.classList.add('show'); drawer.setAttribute('aria-hidden','false')}
+      function closeDrawer(){drawer.classList.remove('open'); overlay.classList.remove('show'); drawer.setAttribute('aria-hidden','true')}
+      openDrawerBtn.addEventListener('click', openDrawer);
+      overlay.addEventListener('click', closeDrawer);
+      closeDrawerBtn.addEventListener('click', closeDrawer);
+
+      applyBtn.addEventListener('click', ()=>{
+        const w = clampInt(workMins.value,1,180);
+        const b = clampInt(breakMins.value,1,60);
+        const c = clampInt(cyclesInput.value,0,24);
+        settings = {work:w, break:b, cycles:c, sound:soundToggle.checked, color: colorPicker.value};
+        saveSettings(settings);
+        stopTimer();
+        mode = 'work';
+        totalSeconds = w * 60; remainingSeconds = totalSeconds; cyclesPlanned = c; cyclesDone = 0;
+        updateColor(settings.color);
+        updateUIFromSettings();
+        updateDisplay();
+        closeDrawer();
+      });
+
+      colorPicker.addEventListener('input', (e)=>{ updateColor(e.target.value); });
+
+      // Controls
+      startBtn.addEventListener('click', ()=>{ if(!running){startTimer()} else if(!paused){pauseTimer()} else {resumeTimer()} });
+      resetBtn.addEventListener('click', ()=>{
+        stopTimer();
+        mode='work'; totalSeconds = settings.work*60; remainingSeconds=totalSeconds; cyclesDone=0;
+        updateUIFromSettings(); updateDisplay();
+      });
+
+      // Core timer
+      function startTimer(){ running=true; paused=false; startTimestamp=performance.now(); startBtn.textContent='Pause'; tick(); }
+      function pauseTimer(){ paused=true; cancelAnimationFrame(rafId); startBtn.textContent='Resume'; }
+      function resumeTimer(){ paused=false; startTimestamp=performance.now(); startBtn.textContent='Pause'; tick(); }
+      function stopTimer(){ running=false; paused=false; cancelAnimationFrame(rafId); startBtn.textContent='Start'; }
+
+      function tick(){
+        const now=performance.now(); const elapsed=(now-startTimestamp)/1000; startTimestamp=now;
+        if(!paused){
+          remainingSeconds-=elapsed;
+          if(remainingSeconds<=0){ phaseComplete(); return; }
+          updateDisplay();
+        }
+        rafId=requestAnimationFrame(tick);
+      }
+
+      function phaseComplete(){
+        remainingSeconds=0; updateDisplay();
+        if(settings.sound) chime(); if(navigator.vibrate) navigator.vibrate([50,50,50]);
+        if(mode==='work'){
+          mode='break'; totalSeconds=settings.break*60; remainingSeconds=totalSeconds; updateUIFromSettings(); startTimestamp=performance.now(); rafId=requestAnimationFrame(tick);
+        }else{
+          cyclesDone++;
+          if(cyclesPlanned!==0 && cyclesDone>=cyclesPlanned){
+            stopTimer(); mode='work'; totalSeconds=settings.work*60; remainingSeconds=totalSeconds; updateUIFromSettings(); updateDisplay(); return;
+          }
+          mode='work'; totalSeconds=settings.work*60; remainingSeconds=totalSeconds; updateUIFromSettings(); startTimestamp=performance.now(); rafId=requestAnimationFrame(tick);
+        }
+      }
+
+      // UI helpers
+      function updateUIFromSettings(){
+        workMins.value=settings.work; breakMins.value=settings.break; cyclesInput.value=settings.cycles; soundToggle.checked=settings.sound; colorPicker.value=settings.color;
+        modeLabel.textContent = mode==='work' ? 'Work' : 'Break';
+        modeDot.style.background = mode==='work' ? 'var(--good)' : 'var(--warn)';
+        modeDot.style.boxShadow = mode==='work' ? '0 0 0 3px rgba(22,163,74,.12)' : '0 0 0 3px rgba(245,158,11,.15)';
+        cycleText.textContent = settings.cycles===0 ? 'Repeating' : `Cycle ${Math.min(cyclesDone+1, settings.cycles)} of ${settings.cycles}`;
+      }
+
+      function updateDisplay(){
+        const seconds=Math.max(0, Math.ceil(remainingSeconds));
+        timeText.textContent = formatTime(seconds);
+        const fraction = remainingSeconds/totalSeconds; // 1 -> 0
+        const offset = CIRC * fraction;
+        progress.setAttribute('stroke-dashoffset', String(offset));
+        progressGlow.setAttribute('stroke-dashoffset', String(offset));
+      }
+
+      function formatTime(s){ const m=Math.floor(s/60); const sec=Math.floor(s%60); return `${m}:${sec.toString().padStart(2,'0')}`; }
+      function clampInt(v,min,max){ v=parseInt(v,10); if(isNaN(v)) v=min; return Math.max(min, Math.min(max,v)); }
+
+      // Settings persistence
+      function loadSettings(){
+        try{ const raw=localStorage.getItem('pomodoro_settings_v3'); if(!raw) return {work:25, break:5, cycles:0, sound:true, color:'#8a38ff'}; const s=JSON.parse(raw); return {work:s.work??25, break:s.break??5, cycles:s.cycles??0, sound:s.sound??true, color:s.color||'#8a38ff'}; }catch(e){ return {work:25, break:5, cycles:0, sound:true, color:'#8a38ff'} }
+      }
+      function saveSettings(s){ try{ localStorage.setItem('pomodoro_settings_v3', JSON.stringify(s)); }catch(e){} }
+
+      // Color update
+      function updateColor(hex){
+        document.documentElement.style.setProperty('--accent', hex);
+        progress.setAttribute('stroke', hex);
+        progressGlow.setAttribute('stroke', hex);
+      }
+
+      // WebAudio chime
+      let audioCtx=null;
+      function chime(){
+        try{
+          audioCtx = audioCtx || new (window.AudioContext||window.webkitAudioContext)();
+          const now=audioCtx.currentTime; const notes=[880,1175,1760];
+          notes.forEach((f,i)=>{ const o=audioCtx.createOscillator(); const g=audioCtx.createGain(); o.type='sine'; o.frequency.value=f; g.gain.setValueAtTime(0.0001, now+i*0.06); g.gain.exponentialRampToValueAtTime(0.18, now+i*0.06+0.02); g.gain.exponentialRampToValueAtTime(0.0001, now+i*0.06+0.28); o.connect(g).connect(audioCtx.destination); o.start(now+i*0.06); o.stop(now+i*0.06+0.3); });
+        }catch(e){}
+      }
+
+      // Keyboard: space toggles
+      window.addEventListener('keydown', (e)=>{ if(e.code==='Space'){ e.preventDefault(); startBtn.click(); } });
+    })();
+  </script>
+</body>
+</html>
